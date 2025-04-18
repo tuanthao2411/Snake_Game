@@ -8,19 +8,36 @@ enum Direction { UP, DOWN, LEFT, RIGHT };
 
 class Snake {
 public:
-    Snake(int x, int y, int gridSize);
+    Snake(int startX, int startY, int gridSize);
+    Snake(int gridSize, SDL_Rect bounds);
+
+    // Di chuyển rắn
     void move();
+
+    // Thay đổi hướng của rắn
+    void changeDirection(Direction newDirection);
+
+    // Kiểm tra va chạm với chính mình
+    bool checkCollisionWithSelf() const;
+
+    // Render rắn lên màn hình
+    void render(SDL_Renderer* renderer) const;
+
+    // Thêm một đoạn vào con rắn
     void grow();
-    void changeDirection(Direction dir);
-    void render(SDL_Renderer* renderer);
+
+    // Lấy hình chữ nhật đầu của con rắn
     SDL_Rect getHead() const;
-    bool checkCollisionWithWall(int screenWidth, int screenHeight);
-    bool checkCollisionWithSelf();
+
+    bool isOutsideBounds() const;
+
+    const std::vector<SDL_Rect>& getBody() const;
 
 private:
-    std::vector<SDL_Rect> body;  // Danh sách các đoạn thân của rắn
-    Direction currentDirection;   // Hướng di chuyển của rắn
-    int gridSize;                 // Kích thước mỗi ô vuông của lưới
+    int m_gridSize;            // Kích thước lưới
+    Direction m_direction;     // Hướng hiện tại
+    std::vector<SDL_Rect> m_body;  // Vị trí của các đoạn
+    SDL_Rect m_bounds;    // Giới hạn biên chơi game
 };
 
 #endif
