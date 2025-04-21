@@ -1,16 +1,82 @@
 #include "snake.h"
 #include <iostream>
+#include <SDL2/SDL_image.h>
 
-Snake::Snake(int gridSize, SDL_Rect bounds)
+Snake::Snake(int gridSize, SDL_Rect bounds, const SDL_FRect* fixedWalls, int wallSize)
     : m_gridSize(gridSize), m_direction(RIGHT) ,m_bounds(bounds)
 {
     // Khởi tạo con rắn với một đoạn đầu
-    m_body.push_back({
+    SDL_Rect head = {
         bounds.x + gridSize * 5,
         bounds.y + gridSize * 5,
         gridSize,
         gridSize
-    });
+    };
+    bool safe = true;
+    if (fixedWalls != nullptr) {
+        for (int i = 0; i < wallSize; ++i) {
+            SDL_FRect wall = fixedWalls[i];
+            if (head.x < wall.x + wall.w && head.x + head.w > wall.x &&
+                head.y < wall.y + wall.h && head.y + head.h > wall.y) {
+                safe = false;
+                break;
+            }
+        }
+    }
+    if (safe) {
+        m_body.push_back(head);
+    } else {
+        // Nếu không an toàn, thử vị trí khác
+        m_body.push_back({bounds.x + gridSize * 10, bounds.y + gridSize * 10, gridSize, gridSize});
+        SDL_Log("Initial snake position was unsafe, moved to (%d, %d)", bounds.x + gridSize * 10, bounds.y + gridSize * 10);
+    }
+}
+
+Snake::~Snake() {
+    if (m_headTexture) {
+        SDL_DestroyTexture(m_headTexture);
+        m_headTexture = nullptr;
+    }
+    if (m_bodyTexture) {
+        SDL_DestroyTexture(m_bodyTexture);
+        m_bodyTexture = nullptr;
+    }
+}
+
+bool Snake::loadHeadTexture(SDL_Renderer* renderer, const char* imagePath) {
+    SDL_Surface* surface = IMG_Load(imagePath);
+    if (!surface) {
+        SDL_Log("Không thể tải hình ảnh đầu rắn: %s | Đường dẫn: %s", IMG_GetError(), imagePath);
+        return false;
+    }
+
+    m_headTexture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_FreeSurface(surface);
+
+    if (!m_headTexture) {
+        SDL_Log("Không thể tạo texture đầu rắn: %s", SDL_GetError());
+        return false;
+    }
+    SDL_Log("Tải texture đầu rắn thành công!");
+    return true;
+}
+
+bool Snake::loadBodyTexture(SDL_Renderer* renderer, const char* imagePath) {
+    SDL_Surface* surface = IMG_Load(imagePath);
+    if (!surface) {
+        SDL_Log("Không thể tải hình ảnh thân rắn: %s | Đường dẫn: %s", IMG_GetError(), imagePath);
+        return false;
+    }
+
+    m_bodyTexture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_FreeSurface(surface);
+
+    if (!m_bodyTexture) {
+        SDL_Log("Không thể tạo texture thân rắn: %s", SDL_GetError());
+        return false;
+    }
+    SDL_Log("Tải texture thân rắn thành công!");
+    return true;
 }
 
 void Snake::move() {
@@ -60,9 +126,17 @@ bool Snake::checkCollisionWithSelf() const {
 }
 
 void Snake::render(SDL_Renderer* renderer) const {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Màu xanh cho rắn
-    for (const auto& segment : m_body) {
-        SDL_RenderFillRect(renderer, &segment);
+    for (size_t i = 0; i < m_body.size(); ++i) {
+        const auto& segment = m_body[i];
+        if (i == 0 && m_headTexture) {
+            SDL_RenderCopy(renderer, m_headTexture, nullptr, &segment);
+        } else if (m_bodyTexture) {
+            SDL_RenderCopy(renderer, m_bodyTexture, nullptr, &segment);
+        } else {
+            SDL_Log("Texture rắn bị null, vẽ hộp màu xanh thay thế.");
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            SDL_RenderFillRect(renderer, &segment);
+        }
     }
 }
 

@@ -12,7 +12,7 @@ Fruit::Fruit(int gridSize, SDL_Rect bounds)
     
     m_rect.w = m_rect.h = m_gridSize;
     std::vector<SDL_Rect> empty;
-    respawn(bounds.x, bounds.y, bounds.w, bounds.h, empty );
+    respawn(bounds.x, bounds.y, bounds.w, bounds.h, empty, nullptr, 0 );
 }
 
 Fruit::~Fruit() {
@@ -40,7 +40,7 @@ bool Fruit::loadTexture(SDL_Renderer* renderer, const char* imagePath) {
     return true;
 }
 
-void Fruit::respawn(int offsetX, int offsetY , int width, int height, const std::vector<SDL_Rect>& snakeBody) {
+void Fruit::respawn(int offsetX, int offsetY , int width, int height, const std::vector<SDL_Rect>& snakeBody, const SDL_FRect* fixedWalls, int wallSize) {
     // Tạo vị trí ngẫu nhiên trong gameBounds
     int cols = width / m_gridSize;
     int rows = height / m_gridSize;
@@ -50,12 +50,31 @@ void Fruit::respawn(int offsetX, int offsetY , int width, int height, const std:
         for (int y = 0; y < rows; ++y) {
             SDL_Point cell = {offsetX + x * m_gridSize, offsetY + y * m_gridSize};
             bool isOccupied = false;
+
+            // Kiểm tra va chạm với rắn
             for (const auto& segment : snakeBody) {
                 if (cell.x == segment.x && cell.y == segment.y) {
                     isOccupied = true;
                     break;
                 }
             }
+
+            // Kiểm tra va chạm với tường cố định
+            if (!isOccupied && fixedWalls != nullptr) {
+                SDL_Rect cellRect = {cell.x, cell.y, m_gridSize, m_gridSize};
+                for (int i = 0; i < wallSize; ++i) {
+                    SDL_FRect wall = fixedWalls[i];
+                    if (cellRect.x < wall.x + wall.w &&
+                        cellRect.x + cellRect.w > wall.x &&
+                        cellRect.y < wall.y + wall.h &&
+                        cellRect.y + cellRect.h > wall.y) {
+                        isOccupied = true;
+                        break;
+                    }
+                }
+            }
+
+
             if (!isOccupied) {
                 emptyCells.push_back(cell);
             }

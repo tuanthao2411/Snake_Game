@@ -12,7 +12,7 @@ public:
     Fruit(int gridSize, SDL_Rect bounds);
     ~Fruit();
     // Tạo quả táo mới tại vị trí ngẫu nhiên
-    void respawn(int offsetX, int offsetY, int width, int height,const std::vector<SDL_Rect>& snakeBody);
+    void respawn(int offsetX, int offsetY, int width, int height,const std::vector<SDL_Rect>& snakeBody,const SDL_FRect* fixedWalls, int wallSize );
 
     // Lấy hình chữ nhật của quả táo (dùng cho kiểm tra va chạm)
     SDL_Rect getRect() const;

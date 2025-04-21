@@ -8,9 +8,8 @@ enum Direction { UP, DOWN, LEFT, RIGHT };
 
 class Snake {
 public:
-    Snake(int startX, int startY, int gridSize);
-    Snake(int gridSize, SDL_Rect bounds);
-
+    Snake(int gridSize, SDL_Rect bounds, const SDL_FRect* fixedWalls, int wallSize);
+    ~Snake();
     // Di chuyển rắn
     void move();
 
@@ -32,12 +31,17 @@ public:
     bool isOutsideBounds() const;
 
     const std::vector<SDL_Rect>& getBody() const;
+    bool loadHeadTexture(SDL_Renderer* renderer, const char* imagePath);
+    bool loadBodyTexture(SDL_Renderer* renderer, const char* imagePath);
+
 
 private:
     int m_gridSize;            // Kích thước lưới
     Direction m_direction;     // Hướng hiện tại
     std::vector<SDL_Rect> m_body;  // Vị trí của các đoạn
     SDL_Rect m_bounds;    // Giới hạn biên chơi game
+    SDL_Texture* m_headTexture = nullptr;
+    SDL_Texture* m_bodyTexture = nullptr;
 };
 
 #endif
