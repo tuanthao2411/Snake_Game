@@ -5,7 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/Header",
-                "D:/SDL2/include"
+                "D:/SDL2/include/SDL2.0"
             ],
             "defines": [
                 "_DEBUG",

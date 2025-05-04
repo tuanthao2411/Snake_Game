@@ -15,7 +15,8 @@ using namespace std;
 #define WINDOW_WIDTH (GRID_WIDTH * TILE_SIZE)
 #define WINDOW_HEIGHT (GRID_HEIGHT * TILE_SIZE)
 #define CELL_SIZE TILE_SIZE
-#define MOVE_INTERVAL 150
+#define BASE_MOVE_INTERVAL 300
+#define DELAY_TIME 50
 
 const int WALLSIZE = 7;
 SDL_FRect fixedWalls[WALLSIZE] = {
@@ -27,6 +28,19 @@ SDL_FRect fixedWalls[WALLSIZE] = {
     {3 * TILE_SIZE, 11 * TILE_SIZE, 11 * TILE_SIZE, TILE_SIZE},
     {16 * TILE_SIZE, 16 * TILE_SIZE, 7 * TILE_SIZE, TILE_SIZE},
 };
+
+// Hằng số cho menu
+const int START_BUTTON_EASY_X = 12;
+const int START_BUTTON_EASY_Y = 9;
+const int START_BUTTON_MEDIUM_X = 12;
+const int START_BUTTON_MEDIUM_Y = 13;
+const int START_BUTTON_HARD_X = 12;
+const int START_BUTTON_HARD_Y = 17;
+
+const int BUTTON_WIDTH = 8;
+const int BUTTON_HEIGHT = 3;
+
+enum GameMode { EASY, MEDIUM, HARD, NONE };
 
 bool checkRectFRectCollision(const SDL_Rect& rect, const SDL_FRect& frect) {
     return rect.x < frect.x + frect.w &&
@@ -67,8 +81,8 @@ void renderBackground(SDL_Renderer* renderer, SDL_Texture* texture, SDL_Rect gam
     SDL_QueryTexture(texture, NULL, NULL, &textureWidth, &textureHeight);
 
    /// Lặp lại texture để phủ kín khu vực chơi
-    for (int x = gameBounds.x; x < gameBounds.x + gameBounds.w; x += textureWidth) {
-        for (int y = gameBounds.y; y < gameBounds.y + gameBounds.h; y += textureHeight) {
+   for (int x = 0; x < WINDOW_WIDTH; x += textureWidth) {
+    for (int y = 0; y < WINDOW_HEIGHT; y += textureHeight) {
             SDL_Rect dstRect = { x, y, textureWidth, textureHeight };
             SDL_RenderCopy(renderer, texture, NULL, &dstRect);
         }
@@ -91,14 +105,13 @@ bool displayGameOver(SDL_Renderer* renderer, SDL_Texture* backgroundTexture, SDL
         }
         if (restart) break;
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_SetRenderDrawColor(renderer, 0, 128, 255, 255);
         SDL_RenderClear(renderer);
-        renderBackground(renderer, backgroundTexture, gameBounds);
 
         SDL_Color textColor = {255, 255, 255, 255};
         SDL_Surface* gameOverSurface = TTF_RenderText_Solid(font, "Game Over", textColor);
         SDL_Texture* gameOverTexture = SDL_CreateTextureFromSurface(renderer, gameOverSurface);
-        SDL_Rect gameOverRect = {WINDOW_WIDTH / 2 - 100, WINDOW_HEIGHT / 2 - 60, gameOverSurface->w, gameOverSurface->h};
+        SDL_Rect gameOverRect = {WINDOW_WIDTH / 2 - gameOverSurface->w / 2, WINDOW_HEIGHT / 2 - 20 , gameOverSurface->w, gameOverSurface->h};
         SDL_RenderCopy(renderer, gameOverTexture, NULL, &gameOverRect);
         SDL_FreeSurface(gameOverSurface);
         SDL_DestroyTexture(gameOverTexture);
@@ -106,7 +119,7 @@ bool displayGameOver(SDL_Renderer* renderer, SDL_Texture* backgroundTexture, SDL
         string scoreText = "Score: " + to_string(score);
         SDL_Surface* scoreSurface = TTF_RenderText_Solid(font, scoreText.c_str(), textColor);
         SDL_Texture* scoreTexture = SDL_CreateTextureFromSurface(renderer, scoreSurface);
-        SDL_Rect scoreRect = {WINDOW_WIDTH / 2 - 50, WINDOW_HEIGHT / 2 - 20, scoreSurface->w, scoreSurface->h};
+        SDL_Rect scoreRect = {WINDOW_WIDTH / 2 - scoreSurface->w /2 , WINDOW_HEIGHT / 2 + 20, scoreSurface->w, scoreSurface->h};
         SDL_RenderCopy(renderer, scoreTexture, NULL, &scoreRect);
         SDL_FreeSurface(scoreSurface);
         SDL_DestroyTexture(scoreTexture);
@@ -114,7 +127,7 @@ bool displayGameOver(SDL_Renderer* renderer, SDL_Texture* backgroundTexture, SDL
         string timeText = "Time: " + to_string(playTimeSeconds) + "s";
         SDL_Surface* timeSurface = TTF_RenderText_Solid(font, timeText.c_str(), textColor);
         SDL_Texture* timeTexture = SDL_CreateTextureFromSurface(renderer, timeSurface);
-        SDL_Rect timeRect = {WINDOW_WIDTH / 2 - 50, WINDOW_HEIGHT / 2 + 20, timeSurface->w, timeSurface->h};
+        SDL_Rect timeRect = {WINDOW_WIDTH / 2 - timeSurface->w / 2, WINDOW_HEIGHT / 2 + 60, timeSurface->w, timeSurface->h};
         SDL_RenderCopy(renderer, timeTexture, NULL, &timeRect);
         SDL_FreeSurface(timeSurface);
         SDL_DestroyTexture(timeTexture);
@@ -124,6 +137,78 @@ bool displayGameOver(SDL_Renderer* renderer, SDL_Texture* backgroundTexture, SDL
     }
     return restart;
 }
+
+
+// Hàm hỗ trợ tải texture
+SDL_Texture* loadTexture(const char* path, SDL_Renderer* renderer) {
+    SDL_Texture* texture = IMG_LoadTexture(renderer, path);
+    if (!texture) std::cerr << "Failed to load texture: " << path << " - " << IMG_GetError() << std::endl;
+    return texture;
+}
+
+// Hàm chờ nhấp chuột
+void waitUntilMousePressedIntoRectangle(SDL_Rect rect) {
+    SDL_Event event;
+    while (true) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) return;
+            if (event.type == SDL_MOUSEBUTTONDOWN) {
+                int x = event.button.x;
+                int y = event.button.y;
+                if ((x >= rect.x && x <= rect.x + rect.w) && (y >= rect.y && y <= rect.y + rect.h)) {
+                    return;
+                }
+            }
+        }
+        SDL_Delay(DELAY_TIME);
+    }
+}
+
+
+GameMode showMenu(SDL_Renderer* renderer,SDL_Texture* menuTexture, SDL_Texture* easyTexture, SDL_Texture* mediumTexture, SDL_Texture* hardTexture) {
+    std::cout << "Entering showMenu" << std::endl;
+    GameMode selectedMode = NONE;
+
+    // Vị trí và kích thước của các nút
+    SDL_Rect easyButtonRect = {START_BUTTON_EASY_X * CELL_SIZE, START_BUTTON_EASY_Y * CELL_SIZE, BUTTON_WIDTH * CELL_SIZE, BUTTON_HEIGHT * CELL_SIZE};
+    SDL_Rect mediumButtonRect = {START_BUTTON_MEDIUM_X * CELL_SIZE, START_BUTTON_MEDIUM_Y * CELL_SIZE, BUTTON_WIDTH * CELL_SIZE, BUTTON_HEIGHT * CELL_SIZE};
+    SDL_Rect hardButtonRect = {START_BUTTON_HARD_X * CELL_SIZE, START_BUTTON_HARD_Y * CELL_SIZE, BUTTON_WIDTH * CELL_SIZE, BUTTON_HEIGHT * CELL_SIZE};
+
+    while (selectedMode == NONE) {
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+
+        if (menuTexture) {
+            SDL_Rect menuRect = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
+            SDL_RenderCopy(renderer, menuTexture, NULL, &menuRect);
+        }
+        if (easyTexture) SDL_RenderCopy(renderer, easyTexture, NULL, &easyButtonRect);
+        if (mediumTexture) SDL_RenderCopy(renderer, mediumTexture, NULL, &mediumButtonRect);
+        if (hardTexture) SDL_RenderCopy(renderer, hardTexture, NULL, &hardButtonRect);
+
+        SDL_RenderPresent(renderer);
+
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) return NONE;
+            if (e.type == SDL_MOUSEBUTTONDOWN) {
+                int x = e.button.x, y = e.button.y;
+                if (x >= easyButtonRect.x && x <= easyButtonRect.x + easyButtonRect.w && y >= easyButtonRect.y && y <= easyButtonRect.y + easyButtonRect.h) {
+                    selectedMode = EASY;
+                } else if (x >= mediumButtonRect.x && x <= mediumButtonRect.x + mediumButtonRect.w && y >= mediumButtonRect.y && y <= mediumButtonRect.y + mediumButtonRect.h) {
+                    selectedMode = MEDIUM;
+                } else if (x >= hardButtonRect.x && x <= hardButtonRect.x + hardButtonRect.w && y >= hardButtonRect.y && y <= hardButtonRect.y + hardButtonRect.h) {
+                    selectedMode = HARD;
+                }
+            }
+        }
+        SDL_Delay(DELAY_TIME);
+    }
+    return selectedMode;
+    
+}
+
+
 
 
 int main(int argc, char* argv[]) {
@@ -171,20 +256,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Tải texture nền
-    SDL_Surface* backgroundSurface = IMG_Load("background.png");
-    if (!backgroundSurface) {
-        std::cerr << "Failed to load background: " << IMG_GetError() << std::endl;
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        TTF_Quit();
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
-    SDL_Texture* backgroundTexture = SDL_CreateTextureFromSurface(renderer, backgroundSurface);
-    SDL_FreeSurface(backgroundSurface);
+    SDL_Texture* backgroundTexture = loadTexture("background.png", renderer);
     if (!backgroundTexture) {
-        std::cerr << "Failed to create background texture: " << SDL_GetError() << std::endl;
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         TTF_Quit();
@@ -192,6 +265,64 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
+
+    // Tải texture nền menu
+    SDL_Texture* menuBackgroundTexture = loadTexture("menu.png", renderer);
+    if (!menuBackgroundTexture) {
+        std::cerr << "Lỗi tải nền menu: " << IMG_GetError() << std::endl;
+        SDL_DestroyTexture(backgroundTexture);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Texture* buttonEasyTexture = loadTexture("easy.png", renderer);
+    if (!buttonEasyTexture) {
+        std::cerr << "Lỗi tải nút Dễ: " << IMG_GetError() << std::endl;
+        SDL_DestroyTexture(backgroundTexture);
+        SDL_DestroyTexture(menuBackgroundTexture);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Texture* buttonMediumTexture = loadTexture("medium.png", renderer);
+    if (!buttonMediumTexture) {
+        std::cerr << "Lỗi tải nút Trung Bình: " << IMG_GetError() << std::endl;
+        SDL_DestroyTexture(backgroundTexture);
+        SDL_DestroyTexture(menuBackgroundTexture);
+        SDL_DestroyTexture(buttonEasyTexture);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Texture* buttonHardTexture = loadTexture("hard.png", renderer);
+    if (!buttonHardTexture) {
+        std::cerr << "Lỗi tải nút Khó: " << IMG_GetError() << std::endl;
+        SDL_DestroyTexture(backgroundTexture);
+        SDL_DestroyTexture(menuBackgroundTexture);
+        SDL_DestroyTexture(buttonEasyTexture);
+        SDL_DestroyTexture(buttonMediumTexture);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+
+
+    
 
     SDL_Surface* mapSurface = IMG_Load("mapcodinh.png");
 if (!mapSurface) {
@@ -247,6 +378,28 @@ if (!mapTexture) {
     }; 
     bool running = true;
     while (running) {
+        // Hiển thị menu và lấy chế độ được chọn
+        GameMode selectedMode = showMenu(renderer, menuBackgroundTexture, buttonEasyTexture, buttonMediumTexture, buttonHardTexture);
+        if (selectedMode == NONE) {
+            running = false;
+            break;
+        }
+
+        // Thiết lập tốc độ di chuyển dựa trên chế độ
+        int moveInterval;
+        switch (selectedMode) {
+            case EASY:
+                moveInterval = BASE_MOVE_INTERVAL / 1.5 ; // 200ms (1x)
+                break;
+            case MEDIUM:
+                moveInterval = BASE_MOVE_INTERVAL / 2; // 150ms (1.5x)
+                break;
+            case HARD:
+                moveInterval = BASE_MOVE_INTERVAL / 3; // 100ms (2x)
+                break;
+            default:
+                moveInterval = BASE_MOVE_INTERVAL;
+        }
     Snake snake(CELL_SIZE, gameBounds, fixedWalls, WALLSIZE);
     if (!snake.loadHeadTexture(renderer, "snake_head.png") || !snake.loadBodyTexture(renderer, "snake_body.png")) {
         std::cerr << "Không thể tải texture rắn" << std::endl;
@@ -284,7 +437,7 @@ if (!mapTexture) {
             }
         }
 
-        if (SDL_GetTicks() - lastMove > MOVE_INTERVAL) {
+        if (SDL_GetTicks() - lastMove > moveInterval) {
             snake.move();
             SDL_Rect head = snake.getHead();
 
@@ -318,7 +471,7 @@ if (!mapTexture) {
         }
 
         // Vẽ nền bằng texture trong gameBounds
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_SetRenderDrawColor(renderer, 205, 182, 193, 255);
         SDL_RenderClear(renderer);
         renderBackground(renderer, backgroundTexture, gameBounds);
     
@@ -330,9 +483,16 @@ if (!mapTexture) {
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
-}
+}   
+
+    // Giải phóng tài nguyên
     SDL_DestroyTexture(backgroundTexture);
+    SDL_DestroyTexture(menuBackgroundTexture);
+    SDL_DestroyTexture(buttonEasyTexture);
+    SDL_DestroyTexture(buttonMediumTexture);
+    SDL_DestroyTexture(buttonHardTexture);
     SDL_DestroyTexture(fixedWallTexture);
+    SDL_DestroyTexture(mapTexture);
     TTF_CloseFont(font);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
