@@ -9,6 +9,7 @@
 #include <string>
 using namespace std;    
 
+
 #define GRID_WIDTH 32
 #define GRID_HEIGHT 24
 #define TILE_SIZE 20
@@ -41,6 +42,7 @@ const int BUTTON_WIDTH = 8;
 const int BUTTON_HEIGHT = 3;
 
 enum GameMode { EASY, MEDIUM, HARD, NONE };
+
 
 bool checkRectFRectCollision(const SDL_Rect& rect, const SDL_FRect& frect) {
     return rect.x < frect.x + frect.w &&
@@ -93,6 +95,13 @@ bool displayGameOver(SDL_Renderer* renderer, SDL_Texture* backgroundTexture, SDL
     bool restart = false;
     SDL_Event e;
 
+    // Tải font pixel (thay vì Arial)
+    TTF_Font* pixelFont = TTF_OpenFont("PressStart2P.ttf", 48); // Kích thước font lớn để có kiểu pixel
+    if (!pixelFont) {
+        std::cerr << "Failed to load pixel font: " << TTF_GetError() << std::endl;
+        pixelFont = font; // Dùng font mặc định nếu không tải được
+    }
+
     while (true) {
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)) {
@@ -105,17 +114,32 @@ bool displayGameOver(SDL_Renderer* renderer, SDL_Texture* backgroundTexture, SDL
         }
         if (restart) break;
 
-        SDL_SetRenderDrawColor(renderer, 0, 128, 255, 255);
+        // Vẽ nền trắng
+        SDL_SetRenderDrawColor(renderer, 240, 220, 200, 255); // Màu nền giống trong hình
         SDL_RenderClear(renderer);
 
-        SDL_Color textColor = {255, 255, 255, 255};
-        SDL_Surface* gameOverSurface = TTF_RenderText_Solid(font, "Game Over", textColor);
-        SDL_Texture* gameOverTexture = SDL_CreateTextureFromSurface(renderer, gameOverSurface);
-        SDL_Rect gameOverRect = {WINDOW_WIDTH / 2 - gameOverSurface->w / 2, WINDOW_HEIGHT / 2 - 20 , gameOverSurface->w, gameOverSurface->h};
-        SDL_RenderCopy(renderer, gameOverTexture, NULL, &gameOverRect);
-        SDL_FreeSurface(gameOverSurface);
-        SDL_DestroyTexture(gameOverTexture);
 
+        // Vẽ "GAME OVER" bằng font pixel
+        SDL_Color gameoverColor = {200, 50, 50, 255}; // Màu đỏ
+        SDL_Surface* gameOverSurface = TTF_RenderText_Solid(pixelFont, "GAME OVER", gameoverColor);
+        if (!gameOverSurface) {
+            std::cerr << "Failed to render GAME OVER text: " << TTF_GetError() << std::endl;
+        } else {
+            SDL_Texture* gameOverTexture = SDL_CreateTextureFromSurface(renderer, gameOverSurface);
+            SDL_Rect gameOverRect = {
+                (WINDOW_WIDTH - gameOverSurface->w) / 2, // Căn giữa
+                WINDOW_HEIGHT / 4, // Đặt ở 1/4 chiều cao màn hình
+                gameOverSurface->w,
+                gameOverSurface->h
+            };
+            SDL_RenderCopy(renderer, gameOverTexture, NULL, &gameOverRect);
+            SDL_FreeSurface(gameOverSurface);
+            SDL_DestroyTexture(gameOverTexture);
+        }
+
+
+        
+        SDL_Color textColor = {0, 0, 0, 255};
         string scoreText = "Score: " + to_string(score);
         SDL_Surface* scoreSurface = TTF_RenderText_Solid(font, scoreText.c_str(), textColor);
         SDL_Texture* scoreTexture = SDL_CreateTextureFromSurface(renderer, scoreSurface);
@@ -137,6 +161,7 @@ bool displayGameOver(SDL_Renderer* renderer, SDL_Texture* backgroundTexture, SDL
     }
     return restart;
 }
+
 
 
 // Hàm hỗ trợ tải texture
